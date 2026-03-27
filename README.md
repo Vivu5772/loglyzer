@@ -45,6 +45,9 @@ cd loglyzer
 pip install -r requirements.txt
 python app.py 
 ```
+```md
+Click👉 [open loglyzer](http://127.0.0.1:5000)
+```
 ## 📈 Use Cases
 - Network Security Monitoring
 - Intrusion Detection Systems
