@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Network Log Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Google Font: Cyber / Terminal vibe -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Font Awesome (for search icon) -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+
+    <!-- Leaflet core (already present, but ensure order) -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- ✅ MarkerCluster plugin (THIS WAS MISSING) -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"
+    />
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+    <style>
+      body {
+        font-family: "Share Tech Mono", monospace;
+        background: #0a0f14;
+        padding: 40px;
+        color: #00ffae;
+        text-align: center;
+      }
+      .container {
+        max-width: 700px;
+        margin: auto;
+        background: #0d1b24;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0, 255, 170, 0.3);
+        border: 1px solid #00ffae80;
+      }
+      h2 {
+        color: #333;
+        font-weight: 600;
+      }
+      input[type="file"] {
+        margin-top: 20px;
+      }
+      button {
+        margin-top: 20px;
+        background: #007bff;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.5);
+        }
+        70% {
+          box-shadow: 0 0 0 14px rgba(211, 47, 47, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(211, 47, 47, 0);
+        }
+      }
+      .leaflet-interactive {
+        filter: drop-shadow(0 0 6px rgba(255, 23, 68, 0.8));
+      }
+      #map-wrapper {
+        position: relative;
+      }
+
+      /* 🗺️ Leaflet map */
+      #map {
+        z-index: 1;
+      }
+
+      /* 🔥 Legend on top */
+      #map-legend {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(10, 10, 10, 0.95);
+        padding: 14px 16px;
+        border-radius: 12px;
+        color: white;
+        font-size: 13px;
+        z-index: 9999; /* 🔑 THIS FIXES IT */
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(6px);
+      }
+
+      /* Legend dots */
+      #map-legend .dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+
+      #map-legend .high {
+        background: #ff1744;
+      }
+      #map-legend .medium {
+        background: #ff9100;
+      }
+      #map-legend .tunnel {
+        background: #d500f9;
+      }
+      /* 🔥 HERO SECTION */
+      /* Inline branding */
+      .loglyzer-inline {
+        margin-top: 18px;
+        text-align: center;
+        font-family: "Orbitron", sans-serif;
+        font-size: 30px; /* medium & professional */
+        font-weight: 600;
+        letter-spacing: 2px;
+        color: #e6fffa;
+      }
+
+      /* Search icon before L */
+      .loglyzer-inline i {
+        color: #00ffe0;
+        margin-right: 10px;
+        font-size: 26px;
+        vertical-align: middle;
+      }
+
+      /* Tool name */
+      .loglyzer-name {
+        vertical-align: middle;
+      }
+
+      /* Tagline below name */
+      .loglyzer-tagline {
+        text-align: center;
+        margin-top: 6px;
+        margin-bottom: 22px;
+        font-size: 12px;
+        letter-spacing: 1px;
+        color: #9fbfc0;
+      }
+      /* 📊 Summary container */
+      .summary-box {
+        margin: 26px auto 30px;
+        padding: 22px 26px;
+        max-width: 700px;
+        background: rgba(10, 25, 30, 0.65);
+        border-radius: 18px;
+        border: 1px solid rgba(0, 255, 224, 0.25);
+        box-shadow: 0 0 25px rgba(0, 255, 224, 0.12);
+      }
+
+      /* Title */
+      .summary-title {
+        text-align: center;
+        font-size: 18px;
+        letter-spacing: 1.5px;
+        color: #00ffe0;
+        margin-bottom: 18px;
+      }
+
+      /* Grid */
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+      }
+
+      /* Each stat */
+      .summary-item {
+        text-align: center;
+      }
+
+      .summary-item span {
+        display: block;
+        font-size: 12px;
+        color: #9fbfc0;
+        margin-bottom: 6px;
+      }
+
+      .summary-item b {
+        font-size: 20px;
+        color: #e6fffa;
+      }
+
+      /* Risk colors */
+      .risk-low {
+        color: #00e676;
+      }
+      .risk-medium {
+        color: #ff9100;
+      }
+      .risk-high {
+        color: #ff1744;
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .summary-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Loglyzer Branding -->
+    <div class="loglyzer-inline">
+      <i class="fa-solid fa-magnifying-glass-chart"></i>
+      <span class="loglyzer-name">Loglyzer</span>
+    </div>
+
+    <div class="loglyzer-tagline">Network Log Analysis & Threat Detection</div>
+
+    <div class="container">
+      <h2>Upload Network Log File</h2>
+      <form
+        id="logForm"
+        action="/upload"
+        method="POST"
+        enctype="multipart/form-data"
+      >
+        <input type="file" name="logfile" accept=".log,.txt" required />
+        <br />
+        <button type="submit">Analyze Logs</button>
+      </form>
+      <!-- 📊 Analysis Summary -->
+      <div id="analysis-summary" class="summary-box" style="display: none">
+        <div class="summary-title">📊 Analysis Summary</div>
+
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span>Logs Analyzed</span>
+            <b id="sum-logs">–</b>
+          </div>
+
+          <div class="summary-item">
+            <span>Unique IPs</span>
+            <b id="sum-ips">–</b>
+          </div>
+
+          <div class="summary-item">
+            <span>Threats Detected</span>
+            <b id="sum-threats">–</b>
+          </div>
+
+          <div class="summary-item">
+            <span>Risk Level</span>
+            <b id="sum-risk">–</b>
+          </div>
+        </div>
+      </div>
+
+      <h2 style="margin-top: 30px">🚨 Detected Attacks</h2>
+
+      <div
+        id="alerts-container"
+        style="
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 16px;
+          margin-top: 15px;
+        "
+      ></div>
+      <h2
+        style="
+          text-align: center;
+          color: #00e5ff;
+          letter-spacing: 2px;
+          margin-bottom: 10px;
+        "
+      >
+        🌐 Attack Origin Intelligence Map
+      </h2>
+
+      <div id="map-wrapper" style="position: relative; width: 100%">
+        <div
+          id="map"
+          style="height: 480px; width: 100%; border-radius: 16px"
+        ></div>
+
+        <!-- 🔥 Attack Legend -->
+        <div id="map-legend">
+          <div><span class="dot high"></span> High Severity</div>
+          <div><span class="dot medium"></span> Medium Severity</div>
+          <div><span class="dot tunnel"></span> DNS Tunneling</div>
+        </div>
+      </div>
+
+      <div id="results" style="margin-top: 25px; display: none">
+        <h3>📊 Analysis Results</h3>
+        <div
+          id="table-output"
+          style="
+            max-height: 300px;
+            overflow: auto;
+            border: 1px solid #00ffae;
+            padding: 10px;
+          "
+        ></div>
+        <canvas
+          id="chart"
+          style="margin-top: 20px; width: 100%; height: 300px"
+        ></canvas>
+      </div>
+      <script>
+        let map = null;
+        let markerCluster = null;
+
+        function renderMap(alerts) {
+          // 1️⃣ Initialize map ONCE
+          if (!map) {
+            map = L.map("map", {
+              zoomControl: true,
+              worldCopyJump: true,
+            }).setView([20, 0], 2);
+
+            // 🌌 Dark cyber-style map
+            L.tileLayer(
+              "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+              {
+                attribution: "© OpenStreetMap © CARTO",
+              }
+            ).addTo(map);
+
+            // 2️⃣ Marker cluster (required)
+            markerCluster = L.markerClusterGroup({
+              spiderfyOnMaxZoom: true,
+              showCoverageOnHover: false,
+              zoomToBoundsOnClick: true,
+            });
+
+            map.addLayer(markerCluster);
+          }
+
+          // 3️⃣ Clear previous markers
+          markerCluster.clearLayers();
+
+          if (!alerts || alerts.length === 0) return;
+
+          // 🎨 Attack color mapping
+          function getStyle(alert) {
+            const a = alert.attack.toLowerCase();
+
+            if (a.includes("tunnel")) return { color: "#b517ff", radius: 10 }; // purple
+            if (a.includes("failure")) return { color: "#ff1744", radius: 10 }; // red
+            if (a.includes("excessive")) return { color: "#ff9100", radius: 9 }; // orange
+
+            return { color: "#00e5ff", radius: 8 }; // cyan
+          }
+
+          alerts.forEach((alert) => {
+            const loc = alert.location;
+
+            // ⚠️ skip invalid locations
+            if (!loc || loc.lat === null || loc.lon === null) return;
+
+            const style = getStyle(alert);
+
+            // 🔴 Pulse marker effect
+            const marker = L.circleMarker([loc.lat, loc.lon], {
+              radius: style.radius,
+              color: style.color,
+              fillColor: style.color,
+              fillOpacity: 0.85,
+              weight: 2,
+              className: "pulse-marker",
+            });
+
+            // 🧾 Popup (clean & readable)
+            marker.bindPopup(`
+        <div style="
+          font-family: Arial;
+          background: #0f172a;
+          color: #e5e7eb;
+          padding: 12px;
+          border-radius: 10px;
+          min-width: 200px;
+        ">
+          <h4 style="margin:0 0 6px 0;color:${style.color}">
+            🚨 ${alert.attack}
+          </h4>
+          <div><b>IP:</b> ${alert.source_ip}</div>
+          <div><b>Country:</b> ${loc.country}</div>
+          <div><b>City:</b> ${loc.city}</div>
+        </div>
+      `);
+
+            markerCluster.addLayer(marker);
+          });
+
+          // 4️⃣ Smooth auto-zoom to markers
+          if (markerCluster.getLayers().length > 0) {
+            map.flyToBounds(markerCluster.getBounds(), {
+              padding: [50, 50],
+              duration: 1.5,
+            });
+          }
+        }
+      </script>
+
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </div>
+
+    <script>
+      document
+        .getElementById("logForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+
+          const fileInput = document.querySelector("input[name='logfile']");
+          if (!fileInput.files.length) {
+            alert("Please select a log file");
+            return;
+          }
+
+          const formData = new FormData();
+          formData.append("logfile", fileInput.files[0]);
+
+          const btn = document.querySelector("button");
+          btn.disabled = true;
+          btn.innerText = "Analyzing...";
+
+          const res = await fetch("/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await res.json();
+
+          btn.disabled = false;
+          btn.innerText = "Analyze Logs";
+
+          if (data.status !== "success") {
+            alert(data.message || "Error processing logs");
+            return;
+          }
+
+          document.getElementById("results").style.display = "block";
+
+          // -----------------------------
+          // Render TABLE
+          // -----------------------------
+          let tableHTML = "<table border='1' width='100%'><tr>";
+          Object.keys(data.rows[0]).forEach(
+            (key) => (tableHTML += `<th>${key}</th>`)
+          );
+          tableHTML += "</tr>";
+
+          data.rows.forEach((row) => {
+            tableHTML += "<tr>";
+            Object.values(row).forEach(
+              (val) => (tableHTML += `<td>${val}</td>`)
+            );
+            tableHTML += "</tr>";
+          });
+          tableHTML += "</table>";
+          document.getElementById("table-output").innerHTML = tableHTML;
+
+          // -----------------------------
+          // Render CHART
+          // -----------------------------
+          const ctx = document.getElementById("chart");
+
+          if (window.chartInstance) {
+            window.chartInstance.destroy();
+          }
+
+          window.chartInstance = new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels: data.chart_labels,
+              datasets: [
+                {
+                  label: "Most Requesting IPs", // ✅ FIX HERE
+                  data: data.chart_values,
+                  borderWidth: 2,
+                  backgroundColor: "rgba(0, 255, 255, 0.35)",
+                  borderColor: "#00e5ff",
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: {
+                  labels: {
+                    color: "#00e5ff",
+                    font: {
+                      size: 14,
+                      weight: "bold",
+                    },
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  ticks: { color: "#b2ebf2" },
+                  grid: { color: "rgba(255,255,255,0.05)" },
+                },
+                y: {
+                  ticks: { color: "#b2ebf2" },
+                  grid: { color: "rgba(255,255,255,0.05)" },
+                },
+              },
+            },
+          });
+          // 📊 Populate Analysis Summary
+          document.getElementById("analysis-summary").style.display = "block";
+
+          document.getElementById("sum-logs").innerText = data.rows.length;
+          document.getElementById("sum-ips").innerText = new Set(
+            data.rows.map((r) => r.src_ip)
+          ).size;
+
+          document.getElementById("sum-threats").innerText = data.alerts.length;
+
+          // Risk logic
+          const riskEl = document.getElementById("sum-risk");
+
+          if (data.alerts.length === 0) {
+            riskEl.innerText = "LOW";
+            riskEl.className = "risk-low";
+          } else if (data.alerts.length <= 3) {
+            riskEl.innerText = "MEDIUM";
+            riskEl.className = "risk-medium";
+          } else {
+            riskEl.innerText = "HIGH";
+            riskEl.className = "risk-high";
+          }
+
+          // -----------------------------
+          // 🔥 Render ALERTS (THIS WAS MISSING)
+          // -----------------------------
+
+          renderAlerts(data.alerts);
+          renderMap(data.alerts);
+        });
+    </script>
+    <script>
+      function renderAlerts(alerts) {
+        const container = document.getElementById("alerts-container");
+        container.innerHTML = "";
+
+        // 🟢 No attacks case
+        if (!alerts || alerts.length === 0) {
+          container.innerHTML = `
+          <div style="
+            padding: 20px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+            color: #1b5e20;
+            font-weight: bold;
+            font-size: 16px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+          ">
+            ✅ Network traffic appears normal<br>
+            <span style="font-size:13px;font-weight:normal;">
+              No malicious activity detected
+            </span>
+          </div>
+        `;
+          return;
+        }
+
+        // 🔴 Attacks detected
+        alerts.forEach((alert) => {
+          let bg = "#ffebee";
+          let border = "#d32f2f";
+          let icon = "🚨";
+          let severity = "HIGH";
+
+          if (alert.attack.toLowerCase().includes("excessive")) {
+            bg = "#fff8e1";
+            border = "#f57c00";
+            icon = "⚠️";
+            severity = "MEDIUM";
+          }
+
+          const card = document.createElement("div");
+
+          card.style = `
+            background: ${bg};
+            border-left: 6px solid ${border};
+            padding: 18px;
+            border-radius: 14px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+            font-family: Arial, sans-serif;
+            position: relative;
+            animation: pulse 1.6s infinite;
+        `;
+
+          card.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <h3 style="margin:0;font-size:18px;">
+                    ${icon} ${alert.attack}
+                </h3>
+                <span style="
+                    padding: 4px 10px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    background: ${border};
+                    color: white;
+                ">
+                    ${severity}
+                </span>
+            </div>
+
+            <p style="margin:10px 0 4px 0;">
+                <b>Source IP:</b> ${alert.source_ip}
+            </p>
+
+            <p style="margin:0;font-size:14px;">
+                ${alert.details}
+            </p>
+        `;
+
+          container.appendChild(card);
+        });
+      }
+    </script>
+  </body>
+</html>
