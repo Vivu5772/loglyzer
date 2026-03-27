@@ -43,11 +43,13 @@ This makes it a useful tool for network security monitoring and intrusion detect
 git clone https://github.com/Vivu5772/loglyzer.git
 cd loglyzer
 pip install -r requirements.txt
-python app.py 
+python app.py
 ```
-```md
-Click👉 [open loglyzer](http://127.0.0.1:5000)
-```
+
+**Click👉** [open loglyzer](http://127.0.0.1:5000)
+  
+  ⚠️ Note: This link works only on your local machine.
+
 ## 📈 Use Cases
 - Network Security Monitoring
 - Intrusion Detection Systems
